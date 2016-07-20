@@ -1,10 +1,14 @@
 local http = require "resty.http"
+local cjson = require "cjson"
 
 local _M = {_VERSION = '0.0.1'}
+_M.__index = _M
 
-function _M.new(self)
-    self.httpc = http.new()
-    return self
+function _M.new()
+    local that = {}
+    setmetatable(that, _M)
+    that.httpc = http.new()
+    return that
 end -- new
 
 function _M.set_timeout(self, timeout)
@@ -24,6 +28,7 @@ function _M.close(self)
 end -- close
 
 function _M.connect(self, ...)
+    self.read_before = false
     return self.httpc:connect(...)
 end -- connect
 
@@ -40,9 +45,23 @@ function _M.request(self, params)
 end -- request
 
 function _M.request_uri(self, uri, params)
+    ngx.log(ngx.ERR, uri)
     params["headers"] = self:headers_format_request(params["headers"])
+    params["method"] = "GET"
+    ngx.log(ngx.ERR, cjson.encode(params))
+    local parsed_uri, err = self.httpc:parse_uri(uri)
+    local scheme, host, port, path = unpack(parsed_uri)
+    local c, err = self.httpc:connect(host, port)
+    if not c then
+        return nil, err
+    end
+    params["path"] = path
+    params["headers"]["Host"] = host
 
-    local res, err = self.httpc:request_uri(uri, params)
+
+
+    local res, err = self.httpc:request(params)
+    --local res, err = self.httpc:request_uri(uri, params)
     if err then
         return nil, err
     end -- if
@@ -54,48 +73,90 @@ end -- request_uri
 
 function _M.parse_sse(self, buffer)
     local strut = { event = nil, id = nil, data = {} }
-
-    local buffer_lines = self.split(buffer, "\r\n")
-    local size = table.getn(buffer_lines)
-    --local empty_in_row = 0
     local strut_started = false
+    local frame_buffer = self.split(buffer, "\n\n") -- group lines by frame
+    local _, full_frame_count = buffer:gsub("\n\n", "\n\n") -- number of full frames that we have
+    local frame_count = table.getn(frame_buffer) -- the number of frames we think we have
+    local passes = 0 -- count the number of times we have gone around the loop
+    local buffer_lines = nil
 
-    if size == 0 then
+    ngx.log(ngx.ERR, cjson.encode(frame_buffer))
+    --local empty_in_row = 0
+
+    if full_frame_count > 0 then -- make sure we have enough to make up a frame
+        ngx.log(ngx.ERR, frame_buffer[1])
+        buffer_lines = self.split(frame_buffer[1], "\n")
+        ngx.log(ngx.ERR, cjson.encode(buffer_lines))
+    else
         return nil, buffer, nil
     end -- if
 
-    for dex, dat in pairs(buffer_lines) then
+    local size = table.getn(buffer_lines)
 
-        if dat == "" then
-            -- update the buffer before we run away
-            buffer = table.concat(buffer_lines, "\r\n", dex+1) -- whats left in the buffer after this line since this is empty
-            break
-        else
-            empty_in_row = 0
-        end -- if
+    for dex, dat in pairs(buffer_lines) do
+        --if dat == "" then
+        --    -- update the buffer before we run away
+        --    buffer = table.concat(buffer_lines, "\n", dex+1) -- whats left in the buffer after this line since this is empty
+        --    break
+        --else
+        --    empty_in_row = 0
+        --end -- if
+
+        local is_comment = false
 
         local s1, s2 = string.find(dat, ":")
+        ngx.log(ngx.ERR, string.find(dat, ":"))
+        ngx.log(ngx.ERR, s1)
         if s1 == nil then
+        elseif s1 == 1 then
+            is_comment = true
 
         end -- if
 
-        strut_started = true
+        ngx.log(ngx.ERR, dat)
 
-        local field = string.sub(dat, 1, s1-1)
-        local value = string.sub(dat, s1+1)
-        -- note: make sure to trim leading whitespace
+        if is_comment == false then
+            strut_started = true
+            local field = string.sub(dat, 1, s1-1)
+            local value = string.sub(dat, s1+1)
+            ngx.log(ngx.ERR, field)
+            ngx.log(ngx.ERR, value)
+            -- note: make sure to trim leading whitespace
 
-        -- for now not checking if the value is already been set
-        if field == "event" then
-            strut.event = value
-        elseif field == "id" then
-            strut.id = value
-        elseif field == "data" then
-            table.insert(strut.data, value)
+            -- for now not checking if the value is already been set
+            if field == "event" then
+                strut.event = value
+            elseif field == "id" then
+                strut.id = value
+            elseif field == "data" then
+                table.insert(strut.data, value)
+            end -- if
         end -- if
+
+        passes = passes + 1
     end -- for
 
+
+    --if passes == size then
+    --    buffer = ""
+    --end -- if
+    ngx.log(ngx.ERR, passes)
+    ngx.log(ngx.ERR, size)
+    ngx.log(ngx.ERR, buffer)
+    ngx.log(ngx.ERR, frame_buffer[1])
+    ngx.log(ngx.ERR, frame_count)
+    ngx.log(ngx.ERR, full_frame_count)
+    ngx.log(ngx.ERR, buffer:len())
+    buffer = table.concat(frame_buffer, "\n\n", 2)
+    ngx.log(ngx.ERR, buffer)
     -- return the data strut and a new buffer that missing the data we parsed and an er ror if it happenes
+    if strut_started == false then
+        if passes > 0 then
+            strut = false
+        else
+            strut = nil
+        end -- if
+    end
     return strut, buffer, err
 end -- parse_sse
 
@@ -107,7 +168,7 @@ function _M.headers_format_request(self, headers)
     headers['Accept'] = "text/event-stream"
 
     if headers['User-Agent'] == nil then
-        headers['User-Agent'] = "lua-resty-sse-v".._M.VERSION
+        headers['User-Agent'] = "lua-resty-sse-v"
     end -- if
 
     return headers
@@ -122,7 +183,7 @@ function _M.headers_check_response(self)
     end -- if
 
     if table.get(content_type) > 0 then
-        for dex, dat in pairs() then
+        for dex, dat in pairs() do
             if string.find(dat, "/") ~= nil then
                 mime = dat
             end -- if
@@ -148,9 +209,29 @@ end -- split
 function _M.sse_loop(self, max_buffer, event_cb, error_cb)
 
     local reader = self.res.body_reader
+    if self.read_before == true then
+        --sock = self.httpc.sock
+        reader = self.httpc:w_body_reader(self.httpc.sock, nil, 65536)
+        --reader = self.httpc:w_body_reader("fff")
+    end
+    self.read_before = true
     local strut = nil
     local buffer = ""
     local parse_err = nil
+
+    if event_cb == nil then
+        event_cb = function(strut)
+            ngx.say(cjson.encode({strut = strut}))
+            ngx.flush(true)
+        end -- function
+    end -- if
+
+    if error_cb == nil then
+        error_cb = function(chunk, err)
+            ngx.log(ngx.ERR, cjson.encode({chunk = chunk, error = err}))
+            ngx.flush(false)
+        end -- function
+    end -- if
 
     if max_buffer == nil then
         max_buffer = 65536
@@ -158,6 +239,8 @@ function _M.sse_loop(self, max_buffer, event_cb, error_cb)
 
     repeat
         -- max size of that we will return as  note it may not be a whole "frame"
+        ngx.log(ngx.ERR, "top of loop")
+        --local chunk, err = reader(max_buffer)
         local chunk, err = reader(max_buffer)
         if err then
             if type(error_cb) == "function" then
@@ -167,16 +250,18 @@ function _M.sse_loop(self, max_buffer, event_cb, error_cb)
         end -- if
 
         if chunk then
-
-            buffer = buffer + chunk
+            ngx.say(chunk)
+            buffer = buffer .. chunk
             strut = nil
             parse_err = nil
 
             repeat
                 -- parse the data that is in the buffer
-                strut, buffer, parse_err = self.parse_sse(buffer)
-                local leave = event_cb(strut)
-            until buffer == 0 or parse_err ~= nil or leave == true
+                strut, buffer, parse_err = self:parse_sse(buffer)
+                if strut ~= nil and strut ~= false then
+                    local leave = event_cb(strut)
+                end
+            until strut == nil or buffer:len() == 0 or parse_err ~= nil or leave == true
 
         end -- if
     until not chunk
