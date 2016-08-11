@@ -45,10 +45,10 @@ function _M.request(self, params)
 end -- request
 
 function _M.request_uri(self, uri, params)
-    ngx.log(ngx.ERR, uri)
+    ngx.log(ngx.DEBUG, uri)
     params["headers"] = self:headers_format_request(params["headers"])
     params["method"] = "GET"
-    ngx.log(ngx.ERR, cjson.encode(params))
+    ngx.log(ngx.DEBUG, cjson.encode(params))
     local parsed_uri, err = self.httpc:parse_uri(uri)
     local scheme, host, port, path = unpack(parsed_uri)
     local c, err = self.httpc:connect(host, port)
@@ -80,13 +80,13 @@ function _M.parse_sse(self, buffer)
     local passes = 0 -- count the number of times we have gone around the loop
     local buffer_lines = nil
 
-    ngx.log(ngx.ERR, cjson.encode(frame_buffer))
+    ngx.log(ngx.DEBUG, cjson.encode(frame_buffer))
     --local empty_in_row = 0
 
     if full_frame_count > 0 then -- make sure we have enough to make up a frame
-        ngx.log(ngx.ERR, frame_buffer[1])
+        ngx.log(ngx.DEBUG, frame_buffer[1])
         buffer_lines = self.split(frame_buffer[1], "\n")
-        ngx.log(ngx.ERR, cjson.encode(buffer_lines))
+        ngx.log(ngx.DEBUG, cjson.encode(buffer_lines))
     else
         return nil, buffer, nil
     end -- if
@@ -105,8 +105,6 @@ function _M.parse_sse(self, buffer)
         local is_comment = false
 
         local s1, s2 = string.find(dat, ":")
-        ngx.log(ngx.ERR, string.find(dat, ":"))
-        ngx.log(ngx.ERR, s1)
         if s1 == nil then
         elseif s1 == 1 then
             is_comment = true
@@ -119,8 +117,6 @@ function _M.parse_sse(self, buffer)
             strut_started = true
             local field = string.sub(dat, 1, s1-1)
             local value = string.sub(dat, s1+1)
-            ngx.log(ngx.ERR, field)
-            ngx.log(ngx.ERR, value)
             -- note: make sure to trim leading whitespace
 
             -- for now not checking if the value is already been set
@@ -140,15 +136,15 @@ function _M.parse_sse(self, buffer)
     --if passes == size then
     --    buffer = ""
     --end -- if
-    ngx.log(ngx.ERR, passes)
+--[[ngx.log(ngx.ERR, passes)
     ngx.log(ngx.ERR, size)
     ngx.log(ngx.ERR, buffer)
     ngx.log(ngx.ERR, frame_buffer[1])
     ngx.log(ngx.ERR, frame_count)
     ngx.log(ngx.ERR, full_frame_count)
-    ngx.log(ngx.ERR, buffer:len())
+    ngx.log(ngx.ERR, buffer:len())]]--
     buffer = table.concat(frame_buffer, "\n\n", 2)
-    ngx.log(ngx.ERR, buffer)
+    --ngx.log(ngx.ERR, buffer)
     -- return the data strut and a new buffer that missing the data we parsed and an er ror if it happenes
     if strut_started == false then
         if passes > 0 then
