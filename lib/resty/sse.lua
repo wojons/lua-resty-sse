@@ -112,7 +112,7 @@ function _M.parse_sse(self, buffer)
 
         end -- if
 
-        ngx.log(ngx.ERR, dat)
+        --ngx.log(ngx.ERR, dat)
 
         if is_comment == false then
             strut_started = true
