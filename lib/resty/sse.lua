@@ -80,7 +80,7 @@ function _M.parse_sse(self, buffer)
     local passes = 0 -- count the number of times we have gone around the loop
     local buffer_lines = nil
 
-    ngx.log(ngx.INFO, cjson.encode(frame_buffer))
+    --ngx.log(ngx.INFO, cjson.encode(frame_buffer))
     --local empty_in_row = 0
 
     if full_frame_count > 0 then -- make sure we have enough to make up a frame
