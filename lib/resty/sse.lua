@@ -209,7 +209,8 @@ function _M.sse_loop(self, max_buffer, event_cb, error_cb)
     -- only run this block if we have not done anything so far
     if self.read_before == true then
         self.buffer = ""
-        reader = self.httpc:w_body_reader(self.httpc.sock, nil, 65536)
+        --reader = self.httpc:w_body_reader(self.httpc.sock, nil, 65536)
+        reader = self.httpc:w_body_reader(self.httpc.sock, nil, nil)
     end -- if
 
     self.read_before = true -- set that we have read something off this buffer at least once
