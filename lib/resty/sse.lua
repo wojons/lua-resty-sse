@@ -205,16 +205,18 @@ end -- split
 function _M.sse_loop(self, max_buffer, event_cb, error_cb)
 
     local reader = self.res.body_reader
+
+    -- only run this block if we have not done anything so far
     if self.read_before == true then
-        --sock = self.httpc.sock
+        self.buffer = ""
         reader = self.httpc:w_body_reader(self.httpc.sock, nil, 65536)
-        --reader = self.httpc:w_body_reader("fff")
-    end
-    self.read_before = true
+    end -- if
+
+    self.read_before = true -- set that we have read something off this buffer at least once
     local strut = nil
-    local buffer = ""
     local parse_err = nil
 
+    -- if event_cb is not defined we will give a base one
     if event_cb == nil then
         event_cb = function(strut)
             ngx.say(cjson.encode({strut = strut}))
@@ -222,6 +224,7 @@ function _M.sse_loop(self, max_buffer, event_cb, error_cb)
         end -- function
     end -- if
 
+    -- if the error_cb was not devined we will provide a base one
     if error_cb == nil then
         error_cb = function(chunk, err)
             ngx.log(ngx.ERR, cjson.encode({chunk = chunk, error = err}))
@@ -229,38 +232,34 @@ function _M.sse_loop(self, max_buffer, event_cb, error_cb)
         end -- function
     end -- if
 
-    if max_buffer == nil then
-        max_buffer = 65536
-    end -- if
+    -- set_timeout the max buffer if one was not already defined
+    if max_buffer == nil then max_buffer = 65536 end -- if
 
     repeat
-        -- max size of that we will return as  note it may not be a whole "frame"
         ngx.log(ngx.INFO, "top of loop")
-        --local chunk, err = reader(max_buffer)
         local chunk, err = reader(max_buffer)
-        if err then
-            if type(error_cb) == "function" then
-                error_cb(chunk, err)
-            end -- if
-            break
+        if err then -- if we have an error show it and and then hop out
+            if type(error_cb) == "function" then error_cb(chunk, err) end -- if
+            break -- break out of the code
         end -- if
 
         if chunk then
-            ngx.say(chunk)
-            buffer = buffer .. chunk
+            --ngx.say(chunk)
+            ngx.log(ngx.INFO, "sse-chunk", chunck)
+            self.buffer = self.buffer .. chunk -- update the buffer with the new chunk
             strut = nil
             parse_err = nil
 
             repeat
                 -- parse the data that is in the buffer
-                strut, buffer, parse_err = self:parse_sse(buffer)
+                strut, self.buffer, parse_err = self:parse_sse(self.buffer)
                 if strut ~= nil and strut ~= false then
                     local leave = event_cb(strut)
                 end
-            until strut == nil or buffer:len() == 0 or parse_err ~= nil or leave == true
+            until strut == nil or self.buffer:len() == 0 or parse_err ~= nil or leave == true
 
         end -- if
-    until not chunk
+    until not chunk -- because we have nothing to do
 end -- sse_loop
 
 
