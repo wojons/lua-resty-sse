@@ -237,7 +237,8 @@ function _M.sse_loop(self, max_buffer, event_cb, error_cb)
 
     repeat
         ngx.log(ngx.INFO, "top of loop")
-        local chunk, err = reader(max_buffer)
+        local chunk, err, pchunk= reader(max_buffer)
+        local chunk, err, pchunk= reader("*l")
         if err then -- if we have an error show it and and then hop out
             if type(error_cb) == "function" then error_cb(chunk, err) end -- if
             break -- break out of the code
@@ -246,7 +247,14 @@ function _M.sse_loop(self, max_buffer, event_cb, error_cb)
         if chunk then
             --ngx.say(chunk)
             ngx.log(ngx.INFO, "sse-chunk", chunck)
-            self.buffer = self.buffer .. chunk -- update the buffer with the new chunk
+            if chunk ~= nil then
+                self.buffer = self.buffer .. chunk .. "\r\n" -- update the buffer with the new chunk
+            end
+
+            if pchunk ~= nil then
+                self.buffer = self.buffer .. pchunk
+            end
+
             strut = nil
             parse_err = nil
 
