@@ -88,6 +88,7 @@ function _M.parse_sse(self, buffer)
         buffer_lines = self.split(frame_buffer[1], "\n")
         ngx.log(ngx.INFO, cjson.encode(buffer_lines))
     else
+        ngx.log(ngx.INFO, "Not enough in buffer ", full_frame_count, " ",cjson.encode(frame_buffer))
         return nil, buffer, nil
     end -- if
 
