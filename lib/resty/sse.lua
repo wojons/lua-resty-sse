@@ -239,7 +239,7 @@ function _M.sse_loop(self, max_buffer, event_cb, error_cb)
 
     repeat
         -- max size of that we will return as  note it may not be a whole "frame"
-        ngx.log(ngx.ERR, "top of loop")
+        ngx.log(ngx.DEBUG, "top of loop")
         --local chunk, err = reader(max_buffer)
         local chunk, err = reader(max_buffer)
         if err then
