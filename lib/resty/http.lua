@@ -373,7 +373,7 @@ local function _body_reader(sock, content_length, default_chunk_size)
                 if max_chunk_size and max_chunk_size < 0 then max_chunk_size = nil end
 
                 if not max_chunk_size then
-                    ngx_log(ngx_ERR, "Buffer size not specified, bailing")
+                    --ngx_log(ngx_ERR, "Buffer size not specified, bailing")
                     break
                 end
             until not str
