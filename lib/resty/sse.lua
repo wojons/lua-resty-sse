@@ -214,7 +214,9 @@ function _M.sse_loop(self, max_buffer, event_cb, error_cb)
         reader = self.httpc:w_body_reader(self.httpc.sock, nil, nil)
     end -- if
 
-    self.buffer = ""
+    if self.buffer == nil then
+        self.buffer = ""
+    end
     self.read_before = true -- set that we have read something off this buffer at least once
     local strut = nil
     local parse_err = nil
