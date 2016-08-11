@@ -535,7 +535,7 @@ function _M.send_request(self, params)
             headers[k] = v
         end
     end
-    ngx.log(ngx.ERR, "aa")
+    --ngx.log(ngx.ERR, "aa")
     -- Ensure minimal headers are set
     if type(body) == 'string' and not headers["Content-Length"] then
         headers["Content-Length"] = #body
@@ -567,9 +567,9 @@ function _M.send_request(self, params)
     -- Format and send request
     local req = _format_request(params)
     ngx_log(ngx_DEBUG, "\n", req)
-    ngx.log(ngx.ERR, "bb")
+    --ngx.log(ngx.ERR, "bb")
     local bytes, err = sock:send(req)
-    ngx.log(ngx.ERR, "cc")
+    --ngx.log(ngx.ERR, "cc")
     if not bytes then
         return nil, err
     end
@@ -582,7 +582,7 @@ function _M.send_request(self, params)
             return nil, err, partial
         end
     end
-    ngx.log(ngx.ERR, "dd")
+    --ngx.log(ngx.ERR, "dd")
 
     return true
 end
@@ -592,7 +592,7 @@ function _M.read_response(self, params)
     local sock = self.sock
 
     local status, version, reason, err
-    ngx.log(ngx.ERR, "00")
+    --ngx.log(ngx.ERR, "00")
     -- If we expect: continue, we need to handle this, sending the body if allowed.
     -- If we don't get 100 back, then status is the actual status.
     if params.headers["Expect"] == "100-continue" then
@@ -617,7 +617,7 @@ function _M.read_response(self, params)
     if not res_headers then
         return nil, err
     end
-    ngx.log(ngx.ERR, "11")
+    --ngx.log(ngx.ERR, "11")
     -- Determine if we should keepalive or not.
     local ok, connection = pcall(str_lower, res_headers["Connection"])
     if ok then
@@ -631,7 +631,7 @@ function _M.read_response(self, params)
     local trailer_reader, err = nil, nil
     local has_body = false
 
-    ngx.log(ngx.ERR, "22")
+    --ngx.log(ngx.ERR, "22")
 
     -- Receive the body_reader
     if _should_receive_body(params.method, status) then
