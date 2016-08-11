@@ -206,13 +206,14 @@ function _M.sse_loop(self, max_buffer, event_cb, error_cb)
 
     local reader = self.res.body_reader
 
-    -- only run this block if we have not done anything so far
+    --only run this if we have run this before
     if self.read_before == true then
-        self.buffer = ""
+
         --reader = self.httpc:w_body_reader(self.httpc.sock, nil, 65536)
         reader = self.httpc:w_body_reader(self.httpc.sock, nil, nil)
     end -- if
-
+    
+    self.buffer = ""
     self.read_before = true -- set that we have read something off this buffer at least once
     local strut = nil
     local parse_err = nil
@@ -247,7 +248,7 @@ function _M.sse_loop(self, max_buffer, event_cb, error_cb)
 
         if chunk then
             --ngx.say(chunk)
-            ngx.log(ngx.INFO, "sse-chunk", chunck)
+            ngx.log(ngx.INFO, "sse-chunk -- ", chunk)
             if chunk ~= nil then
                 self.buffer = self.buffer .. chunk .. "\r\n" -- update the buffer with the new chunk
             end
