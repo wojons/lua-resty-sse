@@ -84,11 +84,11 @@ function _M.parse_sse(self, buffer)
     --local empty_in_row = 0
 
     if full_frame_count > 0 then -- make sure we have enough to make up a frame
-        ngx.log(ngx.INFO, frame_buffer[1])
+        --ngx.log(ngx.INFO, frame_buffer[1])
         buffer_lines = self.split(frame_buffer[1], "\n")
-        ngx.log(ngx.INFO, cjson.encode(buffer_lines))
+        --ngx.log(ngx.INFO, cjson.encode(buffer_lines))
     else
-        ngx.log(ngx.INFO, "Not enough in buffer ", full_frame_count, " ",cjson.encode(frame_buffer))
+        --ngx.log(ngx.INFO, "Not enough in buffer ", full_frame_count, " ",cjson.encode(frame_buffer))
         return nil, buffer, nil
     end -- if
 
@@ -241,7 +241,7 @@ function _M.sse_loop(self, max_buffer, event_cb, error_cb)
     if max_buffer == nil then max_buffer = 65536 end -- if
 
     repeat
-        ngx.log(ngx.INFO, "top of loop")
+        --ngx.log(ngx.INFO, "top of loop")
         --local chunk, err, pchunk= reader(max_buffer)
         local chunk, err, pchunk= reader("*l")
         if err then -- if we have an error show it and and then hop out
