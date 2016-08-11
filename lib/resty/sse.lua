@@ -237,7 +237,7 @@ function _M.sse_loop(self, max_buffer, event_cb, error_cb)
 
     repeat
         ngx.log(ngx.INFO, "top of loop")
-        local chunk, err, pchunk= reader(max_buffer)
+        --local chunk, err, pchunk= reader(max_buffer)
         local chunk, err, pchunk= reader("*l")
         if err then -- if we have an error show it and and then hop out
             if type(error_cb) == "function" then error_cb(chunk, err) end -- if
