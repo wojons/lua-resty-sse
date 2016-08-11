@@ -250,7 +250,7 @@ function _M.sse_loop(self, max_buffer, event_cb, error_cb)
             --ngx.say(chunk)
             ngx.log(ngx.INFO, "sse-chunk -- ", chunk)
             if chunk ~= nil then
-                self.buffer = self.buffer .. chunk -- update the buffer with the new chunk
+                self.buffer = self.buffer .. chunk .. "\n" -- update the buffer with the new chunk
             end
 
             if pchunk ~= nil then
