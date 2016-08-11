@@ -80,7 +80,7 @@ function _M.parse_sse(self, buffer)
     local passes = 0 -- count the number of times we have gone around the loop
     local buffer_lines = nil
 
-    ngx.log(ngx.DEBUG, cjson.encode(frame_buffer))
+    ngx.log(ngx.INFO, cjson.encode(frame_buffer))
     --local empty_in_row = 0
 
     if full_frame_count > 0 then -- make sure we have enough to make up a frame
@@ -235,7 +235,7 @@ function _M.sse_loop(self, max_buffer, event_cb, error_cb)
 
     repeat
         -- max size of that we will return as  note it may not be a whole "frame"
-        ngx.log(ngx.DEBUG, "top of loop")
+        ngx.log(ngx.INFO, "top of loop")
         --local chunk, err = reader(max_buffer)
         local chunk, err = reader(max_buffer)
         if err then
