@@ -45,20 +45,23 @@ function _M.request(self, params)
 end -- request
 
 function _M.request_uri(self, uri, params)
-    ngx.log(ngx.DEBUG, uri)
+
     params["headers"] = self:headers_format_request(params["headers"])
     params["method"] = "GET"
-    ngx.log(ngx.DEBUG, cjson.encode(params))
+
     local parsed_uri, err = self.httpc:parse_uri(uri)
-    local scheme, host, port, path = unpack(parsed_uri)
+    local scheme, host, port, params['path'] = unpack(parsed_uri)
     local c, err = self.httpc:connect(host, port)
+
     if not c then
         return nil, err
     end
+
     params["path"] = path
-    params["headers"]["Host"] = host
 
-
+    if params['headers']['Host'] == nil then
+        params["headers"]["Host"] = host
+    end
 
     local res, err = self.httpc:request(params)
     --local res, err = self.httpc:request_uri(uri, params)
@@ -68,92 +71,43 @@ function _M.request_uri(self, uri, params)
 
     self.res = res
     return res, err
-    --res.body = nil -- remove the body since we wont need it
 end -- request_uri
 
 function _M.parse_sse(self, buffer)
-    local strut = { event = nil, id = nil, data = {} }
-    local strut_started = false
-    local frame_buffer = self.split(buffer, "\n\n") -- group lines by frame
-    local _, full_frame_count = buffer:gsub("\n\n", "\n\n") -- number of full frames that we have
-    local frame_count = table.getn(frame_buffer) -- the number of frames we think we have
-    local passes = 0 -- count the number of times we have gone around the loop
-    local buffer_lines = nil
+    local strut                 = { event = nil, id = nil, data = {} }
+    local strut_started         = false
+    local buffer_lines          = nil
+    local frame_break           = string.find(buffer, "\n\n") -- make sure we have at least one frame ini this
 
-    --ngx.log(ngx.INFO, cjson.encode(frame_buffer))
-    --local empty_in_row = 0
-
-    if full_frame_count > 0 then -- make sure we have enough to make up a frame
-        --ngx.log(ngx.INFO, frame_buffer[1])
-        buffer_lines = self.split(frame_buffer[1], "\n")
-        --ngx.log(ngx.INFO, cjson.encode(buffer_lines))
+    if frame_break ~= nil then
+        buffer_lines = self.split(string.sub(buffer, 1, frame_break), "\n") -- get one frame from the buffer and split it into lines
     else
-        --ngx.log(ngx.INFO, "Not enough in buffer ", full_frame_count, " ",cjson.encode(frame_buffer))
         return nil, buffer, nil
     end -- if
 
-    local size = table.getn(buffer_lines)
+    for _, dat in pairs(buffer_lines) do
 
-    for dex, dat in pairs(buffer_lines) do
-        --if dat == "" then
-        --    -- update the buffer before we run away
-        --    buffer = table.concat(buffer_lines, "\n", dex+1) -- whats left in the buffer after this line since this is empty
-        --    break
-        --else
-        --    empty_in_row = 0
-        --end -- if
+        local s1, s2 = string.find(dat, ":") -- find where the cut point is
 
-        local is_comment = false
-
-        local s1, s2 = string.find(dat, ":")
-        if s1 == nil then
-        elseif s1 == 1 then
-            is_comment = true
-
-        end -- if
-
-        --ngx.log(ngx.ERR, dat)
-
-        if is_comment == false then
+        if s1 ~= 1 then
             strut_started = true
-            local field = string.sub(dat, 1, s1-1)
-            local value = string.sub(dat, s1+1)
+            local field = string.sub(dat, 1, s1-1) -- returns "data " from data: hello world
+            local value = string.sub(dat, s1+1) -- returns "hello world" from data: hello world
             -- note: make sure to trim leading whitespace
 
             -- for now not checking if the value is already been set
-            if field == "event" then
-                strut.event = value
-            elseif field == "id" then
-                strut.id = value
-            elseif field == "data" then
-                table.insert(strut.data, value)
+            if field == "event" then strut.event = value
+            elseif field == "id" then strut.id = value
+            elseif field == "data" then table.insert(strut.data, value)
             end -- if
+        else
+            -- this is for comments
         end -- if
-
-        passes = passes + 1
     end -- for
 
+    -- reply back with the rest of the buffer
+    buffer = table.concat(buffer, frame_break+2) -- +2 because we want to be on the other side of \n\n
 
-    --if passes == size then
-    --    buffer = ""
-    --end -- if
---[[ngx.log(ngx.ERR, passes)
-    ngx.log(ngx.ERR, size)
-    ngx.log(ngx.ERR, buffer)
-    ngx.log(ngx.ERR, frame_buffer[1])
-    ngx.log(ngx.ERR, frame_count)
-    ngx.log(ngx.ERR, full_frame_count)
-    ngx.log(ngx.ERR, buffer:len())]]--
-    buffer = table.concat(frame_buffer, "\n\n", 2)
-    --ngx.log(ngx.ERR, buffer)
-    -- return the data strut and a new buffer that missing the data we parsed and an er ror if it happenes
-    if strut_started == false then
-        if passes > 0 then
-            strut = false
-        else
-            strut = nil
-        end -- if
-    end
     return strut, buffer, err
 end -- parse_sse
 
@@ -172,24 +126,20 @@ function _M.headers_format_request(self, headers)
 end -- headers_format_request
 
 function _M.headers_check_response(self)
-    local mime = nil
-    local content_type = self.split(self.res.headers["Content-Type"], ";")
+    local find_mime = nil
 
+    -- check to make sure the status code that came back is the coorect range
     if self.res.status < 200 and self.res.status > 299 then
         return nil, "Status Non-200 ("..self.res.status..")"
     end -- if
 
-    if table.get(content_type) > 0 then
-        for dex, dat in pairs() do
-            if string.find(dat, "/") ~= nil then
-                mime = dat
-            end -- if
-        end -- for
-    end -- if
+    -- make sure we got the right content type back in the headers
+    find_mime, _ = string.find(self.res.headers["Content-Type"], "text/event-stream")
+    if find_mime == nil then
+        return nil, "Content Type not text/event-stream"
+    end
 
-    if mime ~= "text/event-stream" then
-        return nil, "Contnt type not text/event-stream"
-    end -- if
+    return true
 
 end -- headers_check_response
 
@@ -203,85 +153,99 @@ function _M.split(str, delim)
     return result
 end -- split
 
+function _M.default_cb(self)
+
+    if self["callbacks"]["default"] == nil then
+
+        if self["callbacks"] == nil then
+            self['callbacks'] = {}
+        end -- if
+
+        if self["callbacks"]["default"] == nil then
+            self['callbacks']["default"] = {}
+        end
+
+        self["callbacks"]["default"]["error"] = function(chunk, err)
+            ngx.log(ngx.ERR, cjson.encode({chunk = chunk, error = err}))
+            ngx.flush(false)
+        end -- function
+
+        self["callbacks"]["default"]["event"] = function(strut)
+            ngx.say(cjson.encode({strut = strut}))
+            ngx.flush(true)
+        end -- function
+    end -- if
+end
+
 function _M.sse_loop(self, max_buffer, event_cb, error_cb)
 
-    local reader = self.res.body_reader
+    local reader = nil
+    local parse_err = nil
+    local strut     = nil
 
     --only run this if we have run this before
     if self.read_before == true then
 
         --reader = self.httpc:w_body_reader(self.httpc.sock, nil, 65536)
         reader = self.httpc:w_body_reader(self.httpc.sock, nil, nil)
+    else
+        self.read_before = true -- set that we have read something off this buffer at least once
+        self.default_cb() -- load the deafult callbacks if not loaded
+        reader = self.res.body_reader -- get the parent reader
+
+        if type(event_cb) == "function" then
+            event_cb = self["callbacks"]["default"]["event"]
+        end -- if
+
+        if type(error_cb) == "function" then
+            error_cb = self["callbacks"]["default"]["error"]
+        end -- if
+
+        if type(self.buffer) ~= "string" then
+            self.buffer = ""
+        end
+
     end -- if
-
-    if self.buffer == nil then
-        self.buffer = ""
-    end
-    self.read_before = true -- set that we have read something off this buffer at least once
-    local strut = nil
-    local parse_err = nil
-
-    -- if event_cb is not defined we will give a base one
-    if event_cb == nil then
-        event_cb = function(strut)
-            ngx.say(cjson.encode({strut = strut}))
-            ngx.flush(true)
-        end -- function
-    end -- if
-
-    -- if the error_cb was not devined we will provide a base one
-    if error_cb == nil then
-        error_cb = function(chunk, err)
-            ngx.log(ngx.ERR, cjson.encode({chunk = chunk, error = err}))
-            ngx.flush(false)
-        end -- function
-    end -- if
-
-    -- set_timeout the max buffer if one was not already defined
-    if max_buffer == nil then max_buffer = 65536 end -- if
 
     repeat
         --ngx.log(ngx.INFO, "top of loop")
-        --local chunk, err, pchunk= reader(max_buffer)
+
         local chunk, err, pchunk= reader("*l")
         if err then -- if we have an error show it and and then hop out
-            if type(error_cb) == "function" then error_cb(chunk, err) end -- if
+            chunks = cjson.encode({chunk, pchunk})
+            if type(error_cb) == "function" then error_cb(chunks, err) end -- if
             break -- break out of the code
         end -- if
 
-        if chunk ~= nil or pchunk ~= nil then
-            --ngx.say(chunk)
-            --ngx.log(ngx.INFO, "sse-chunk -- ", chunk)
-            if chunk ~= nil then
-                self.buffer = self.buffer .. chunk .. "\n" -- update the buffer with the new chunk
-            end
-
-            if pchunk ~= nil then
-                self.buffer = self.buffer .. pchunk
-            end
-
-            strut = nil
-            parse_err = nil
-
-            -- todo: we may want to run this on pchunk but not sure yet
-            while chunk ~= nil or self.buffer:len() > 0 do
-            -- until strut == nil or self.buffer:len() == 0 or parse_err ~= nil or leave == true
-
-                -- parse the data that is in the buffer
-                strut, self.buffer, parse_err = self:parse_sse(self.buffer)
-                if strut ~= nil and strut ~= false then
-                    local leave = event_cb(strut)
-                end
-
-                -- lets see if its time to blow this popsical joint
-                if struct == nil or strut == false or leave == true or parse_err ~= nil then
-                    break
-                end -- if
-            end -- while
-
+        if chunk ~= nil then -- this means we got a full line from the system
+            self.buffer = self.buffer .. chunk .. "\n" -- update the buffer with the new chunk
         end -- if
-    until not chunk -- because we have nothing to do
-end -- sse_loop
 
+        if pchunk ~= nil then -- this means we did not get a full line
+            self.buffer = self.buffer .. pchunk
+        end -- if
+
+        -- todo: we may want to run this on pchunk but not sure yet
+        while chunk ~= nil or self.buffer:len() > 0 do
+        -- until strut == nil or self.buffer:len() == 0 or parse_err ~= nil or leave == true
+
+            -- parse the data that is in the buffer
+            strut, self.buffer, parse_err = self:parse_sse(self.buffer)
+            if strut ~= nil and strut ~= false then
+                local leave = event_cb(strut)
+            end -- if
+
+            -- lets see if its time to blow this popsical joint
+            if struct == nil or strut == false or leave == true or parse_err ~= nil then
+                if parse_err ~= nil then
+                    -- speak about the parse error
+                end -- if
+
+                break
+            end -- if
+        end -- while
+
+    until not chunk or not pchunk -- because we have nothing to do
+end -- sse_loop
 
 return _M
