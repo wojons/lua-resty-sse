@@ -249,7 +249,7 @@ function _M.sse_loop(self, max_buffer, event_cb, error_cb)
             break -- break out of the code
         end -- if
 
-        if chunk then
+        if chunk ~= nil or pchunk ~= nil then
             --ngx.say(chunk)
             --ngx.log(ngx.INFO, "sse-chunk -- ", chunk)
             if chunk ~= nil then
