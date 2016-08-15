@@ -263,13 +263,21 @@ function _M.sse_loop(self, max_buffer, event_cb, error_cb)
             strut = nil
             parse_err = nil
 
-            repeat
+            -- todo: we may want to run this on pchunk but not sure yet
+            while chunk ~= nil or self.buffer:len() > 0 do
+            -- until strut == nil or self.buffer:len() == 0 or parse_err ~= nil or leave == true
+
                 -- parse the data that is in the buffer
                 strut, self.buffer, parse_err = self:parse_sse(self.buffer)
                 if strut ~= nil and strut ~= false then
                     local leave = event_cb(strut)
                 end
-            until strut == nil or self.buffer:len() == 0 or parse_err ~= nil or leave == true
+
+                -- lets see if its time to blow this popsical joint
+                if struct == nil or strut == false or leave == true or parse_err ~= nil then
+                    break
+                end -- if
+            end -- while
 
         end -- if
     until not chunk -- because we have nothing to do
