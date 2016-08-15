@@ -92,7 +92,7 @@ function _M.parse_sse(self, buffer)
         if s1 ~= 1 then
             strut_started = true
             local field = string.sub(dat, 1, s1-1) -- returns "data " from data: hello world
-            local value = string.sub(dat, s1+1) -- returns "hello world" from data: hello world
+            local value = self:ltrim(string.sub(dat, s1+1)) -- returns "hello world" from data: hello world
             -- note: make sure to trim leading whitespace
 
             -- for now not checking if the value is already been set
@@ -144,7 +144,10 @@ function _M.headers_check_response(self)
 end -- headers_check_response
 
 function _M.split(str, delim)
-    local result,pat,lastPos = {},"(.-)" .. delim .. "()",1
+    local result = {}
+    local pat ""..delim.."()"
+    local lastPos = 1
+
     for part, pos in string.gfind(str, pat) do
         table.insert(result, part); lastPos = pos
     end -- for
@@ -247,5 +250,23 @@ function _M.sse_loop(self, max_buffer, event_cb, error_cb)
 
     until not chunk or not pchunk -- because we have nothing to do
 end -- sse_loop
+
+-- remove trailing and leading whitespace from string.
+function _M.trim(self, s)
+  -- from PiL2 20.4
+  return (s:gsub("^%s*(.-)%s*$", "%1"))
+end
+
+-- remove leading whitespace from string.
+function _M.ltrim(self, s)
+  return (s:gsub("^%s*", ""))
+end
+
+-- remove trailing whitespace from string.
+function _M.rtrim(self, s)
+  local n = #s
+  while n > 0 and s:find("^%s", n) do n = n - 1 end
+  return s:sub(1, n)
+end
 
 return _M
