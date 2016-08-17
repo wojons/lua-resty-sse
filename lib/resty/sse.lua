@@ -50,7 +50,7 @@ function _M.request_uri(self, uri, params)
     params["method"] = "GET"
 
     local parsed_uri, err = self.httpc:parse_uri(uri)
-    local scheme, host, port, params['path'] = unpack(parsed_uri)
+    local scheme, host, port, path = unpack(parsed_uri)
     local c, err = self.httpc:connect(host, port)
 
     if not c then
