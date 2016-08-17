@@ -144,9 +144,9 @@ function _M.headers_check_response(self)
 end -- headers_check_response
 
 function _M.split(str, delim)
-    local result = {}
-    local pat ""..delim.."()"
-    local lastPos = 1
+    local result    = {}
+    local pat       = ""..delim.."()"
+    local lastPos   = 1
 
     for part, pos in string.gfind(str, pat) do
         table.insert(result, part); lastPos = pos
