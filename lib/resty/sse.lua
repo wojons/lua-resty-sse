@@ -193,7 +193,7 @@ function _M.sse_loop(self, max_buffer, event_cb, error_cb)
         reader = self.httpc:w_body_reader(self.httpc.sock, nil, nil)
     else
         self.read_before = true -- set that we have read something off this buffer at least once
-        self.default_cb() -- load the deafult callbacks if not loaded
+        self:default_cb() -- load the deafult callbacks if not loaded
         reader = self.res.body_reader -- get the parent reader
 
         if type(event_cb) == "function" then
