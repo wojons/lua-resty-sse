@@ -189,8 +189,8 @@ function _M.sse_loop(self, max_buffer, event_cb, error_cb)
     --only run this if we have run this before
     if self.read_before == true then
 
-        --reader = self.httpc:w_body_reader(self.httpc.sock, nil, 65536)
-        reader = self.httpc:w_body_reader(self.httpc.sock, nil, nil)
+        reader = self.httpc:w_body_reader(self.httpc.sock, nil, 65536)
+        --reader = self.httpc:w_body_reader(self.httpc.sock, nil, nil)
     else
         self.read_before = true -- set that we have read something off this buffer at least once
         self:default_cb() -- load the deafult callbacks if not loaded
