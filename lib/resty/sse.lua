@@ -5,9 +5,12 @@ local _M = {_VERSION = '0.0.1'}
 _M.__index = _M
 
 function _M.new()
-    local that = {}
+    local httpc, err = http.new()
+    if not httpc then
+        return nil, err
+    end
+    local that = {httpc=httpc}
     setmetatable(that, _M)
-    that.httpc = http.new()
     return that
 end -- new
 
