@@ -5,9 +5,12 @@ local _M = {_VERSION = '0.0.1'}
 _M.__index = _M
 
 function _M.new()
-    local that = {}
+    local httpc, err = http.new()
+    if not httpc then
+        return nil, err
+    end
+    local that = {httpc=httpc}
     setmetatable(that, _M)
-    that.httpc = http.new()
     return that
 end -- new
 
@@ -89,16 +92,16 @@ function _M.parse_sse(self, buffer)
 
         local s1, s2 = string.find(dat, ":") -- find where the cut point is
 
-        if s1 ~= 1 then
+        if s1 and s1 ~= 1 then
             strut_started = true
             local field = string.sub(dat, 1, s1-1) -- returns "data " from data: hello world
             local value = self:ltrim(string.sub(dat, s1+1)) -- returns "hello world" from data: hello world
             -- note: make sure to trim leading whitespace
 
             -- for now not checking if the value is already been set
-            if field == "event" then strut.event = value
-            elseif field == "id" then strut.id = value
-            elseif field == "data" then table.insert(strut.data, value)
+            if     field == "event" then strut.event = value
+            elseif field == "id"    then strut.id = value
+            elseif field == "data"  then table.insert(strut.data, value)
             end -- if
         else
             -- this is for comments
@@ -106,7 +109,7 @@ function _M.parse_sse(self, buffer)
     end -- for
 
     -- reply back with the rest of the buffer
-    buffer = table.concat(buffer, frame_break+2) -- +2 because we want to be on the other side of \n\n
+    buffer = string.sub(buffer, frame_break+2) -- +2 because we want to be on the other side of \n\n
 
     return strut, buffer, err
 end -- parse_sse
@@ -145,39 +148,36 @@ end -- headers_check_response
 
 function _M.split(str, delim)
     local result    = {}
-    local pat       = ""..delim.."()"
+    local pat       = "(.-)"..delim.."()"
     local lastPos   = 1
 
-    for part, pos in string.gfind(str, pat) do
-        table.insert(result, part); lastPos = pos
+    local gfind = string.gfind or string.gmatch -- http://lua-users.org/lists/lua-l/2013-04/msg00117.html
+    for part, pos in gfind(str, pat) do
+        table.insert(result, part)
+        lastPos = pos
     end -- for
-
     table.insert(result, string.sub(str, lastPos))
     return result
 end -- split
 
 function _M.default_cb(self)
+    if self["callbacks"] == nil then
+        self['callbacks'] = {}
+    end -- if
 
     if self["callbacks"]["default"] == nil then
+        self['callbacks']["default"] = {}
+    end
 
-        if self["callbacks"] == nil then
-            self['callbacks'] = {}
-        end -- if
+    self["callbacks"]["default"]["error"] = function(chunk, err)
+        ngx.log(ngx.ERR, cjson.encode({chunk = chunk, error = err}))
+        ngx.flush(false)
+    end -- function
 
-        if self["callbacks"]["default"] == nil then
-            self['callbacks']["default"] = {}
-        end
-
-        self["callbacks"]["default"]["error"] = function(chunk, err)
-            ngx.log(ngx.ERR, cjson.encode({chunk = chunk, error = err}))
-            ngx.flush(false)
-        end -- function
-
-        self["callbacks"]["default"]["event"] = function(strut)
-            ngx.say(cjson.encode({strut = strut}))
-            ngx.flush(true)
-        end -- function
-    end -- if
+    self["callbacks"]["default"]["event"] = function(strut)
+        ngx.say(cjson.encode({strut = strut}))
+        ngx.flush(true)
+    end -- function
 end
 
 function _M.sse_loop(self, max_buffer, event_cb, error_cb)
@@ -187,36 +187,24 @@ function _M.sse_loop(self, max_buffer, event_cb, error_cb)
     local strut     = nil
 
     --only run this if we have run this before
-    if self.read_before == true then
-
+    if self.read_before then
         reader = self.httpc:w_body_reader(self.httpc.sock, nil, 65536)
         --reader = self.httpc:w_body_reader(self.httpc.sock, nil, nil)
     else
         self.read_before = true -- set that we have read something off this buffer at least once
         self:default_cb() -- load the deafult callbacks if not loaded
+        self.buffer = ""  -- initialize buffer
         reader = self.res.body_reader -- get the parent reader
-
-        if type(event_cb) == "function" then
-            event_cb = self["callbacks"]["default"]["event"]
-        end -- if
-
-        if type(error_cb) == "function" then
-            error_cb = self["callbacks"]["default"]["error"]
-        end -- if
-
-        if type(self.buffer) ~= "string" then
-            self.buffer = ""
-        end
-
     end -- if
 
-    repeat
-        --ngx.log(ngx.INFO, "top of loop")
+    if not event_cb then event_cb = self["callbacks"]["default"]["event"] end
+    if not error_cb then error_cb = self["callbacks"]["default"]["error"] end
 
+    repeat
         local chunk, err, pchunk= reader("*l")
         if err then -- if we have an error show it and and then hop out
             chunks = cjson.encode({chunk, pchunk})
-            if type(error_cb) == "function" then error_cb(chunks, err) end -- if
+            error_cb(chunks, err)
             break -- break out of the code
         end -- if
 
@@ -239,7 +227,7 @@ function _M.sse_loop(self, max_buffer, event_cb, error_cb)
             end -- if
 
             -- lets see if its time to blow this popsical joint
-            if struct == nil or strut == false or leave == true or parse_err ~= nil then
+            if strut == nil or strut == false or leave == true or parse_err ~= nil then
                 if parse_err ~= nil then
                     -- speak about the parse error
                 end -- if
