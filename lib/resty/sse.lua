@@ -36,6 +36,7 @@ function _M.connect(self, ...)
 end -- connect
 
 function _M.request(self, params)
+    params["method"]  = "GET"
     params["headers"] = self:headers_format_request(params["headers"])
 
     local res, err = self.httpc:request(params)
@@ -48,32 +49,24 @@ function _M.request(self, params)
 end -- request
 
 function _M.request_uri(self, uri, params)
-
-    params["headers"] = self:headers_format_request(params["headers"])
-    params["method"] = "GET"
-
     local parsed_uri, err = self.httpc:parse_uri(uri)
-    local scheme, host, port, path = unpack(parsed_uri)
-    local c, err = self.httpc:connect(host, port)
+    if not parsed_uri then
+        return nil, err
+    end
 
+    local scheme, host, port, path = unpack(parsed_uri)
+
+    local c, err = self:connect(host, port)
     if not c then
         return nil, err
     end
 
-    params["path"] = path
-
-    if params['headers']['Host'] == nil then
+    params["path"]    = path
+    params["headers"] = self:headers_format_request(params["headers"])
+    if params["headers"]["Host"] == nil then
         params["headers"]["Host"] = host
     end
-
-    local res, err = self.httpc:request(params)
-    --local res, err = self.httpc:request_uri(uri, params)
-    if err then
-        return nil, err
-    end -- if
-
-    self.res = res
-    return res, err
+    return self:request(params)
 end -- request_uri
 
 function _M.parse_sse(self, buffer)
