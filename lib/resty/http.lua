@@ -67,7 +67,7 @@ end
 
 
 local _M = {
-    _VERSION = '0.08',
+    _VERSION = '0.09',
 }
 _M._USER_AGENT = "lua-resty-http/" .. _M._VERSION .. " (Lua) ngx_lua/" .. ngx.config.ngx_lua_version
 
@@ -188,15 +188,15 @@ end
 
 
 function _M.parse_uri(self, uri)
-    local m, err = ngx_re_match(uri, [[^(http[s]*)://([^:/]+)(?::(\d+))?(.*)]],
+    local m, err = ngx_re_match(uri, [[^(http[s]?)://([^:/]+)(?::(\d+))?(.*)]],
         "jo")
 
     if not m then
         if err then
-            return nil, "failed to match the uri: " .. err
+            return nil, "failed to match the uri: " .. uri .. ", " .. err
         end
 
-        return nil, "bad uri"
+        return nil, "bad uri: " .. uri
     else
         if m[3] then
             m[3] = tonumber(m[3])
@@ -504,14 +504,14 @@ end
 local function _handle_continue(sock, body)
     local status, version, reason, err = _receive_status(sock)
     if not status then
-        return nil, err
+        return nil, nil, err
     end
 
     -- Only send body if we receive a 100 Continue
     if status == 100 then
         local ok, err = sock:receive("*l") -- Read carriage return
         if not ok then
-            return nil, err
+            return nil, nil, err
         end
         _send_body(sock, body)
     end
@@ -541,6 +541,9 @@ function _M.send_request(self, params)
         headers["Content-Length"] = #body
     end
     if not headers["Host"] then
+        if (str_sub(self.host, 1, 5) == "unix:") then
+            return nil, "Unable to generate a useful Host header for a unix domain socket. Please provide one."
+        end
         -- If we have a port (i.e. not connected to a unix domain socket), and this
         -- port is non-standard, append it to the Host heaer.
         if self.port then
@@ -567,7 +570,6 @@ function _M.send_request(self, params)
     -- Format and send request
     local req = _format_request(params)
     ngx_log(ngx_DEBUG, "\n", req)
-
     local bytes, err = sock:send(req)
 
     if not bytes then
@@ -582,7 +584,6 @@ function _M.send_request(self, params)
             return nil, err, partial
         end
     end
-
 
     return true
 end
@@ -618,11 +619,16 @@ function _M.read_response(self, params)
         return nil, err
     end
 
-    -- Determine if we should keepalive or not.
+    -- keepalive is true by default. Determine if this is correct or not.
     local ok, connection = pcall(str_lower, res_headers["Connection"])
     if ok then
         if  (version == 1.1 and connection == "close") or
             (version == 1.0 and connection ~= "keep-alive") then
+            self.keepalive = false
+        end
+    else
+        -- no connection header
+        if version == 1.0 then
             self.keepalive = false
         end
     end
@@ -630,8 +636,6 @@ function _M.read_response(self, params)
     local body_reader = _no_body_reader
     local trailer_reader, err = nil, nil
     local has_body = false
-
-
 
     -- Receive the body_reader
     if _should_receive_body(params.method, status) then
