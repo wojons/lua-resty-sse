@@ -1,7 +1,7 @@
-local http = require "resty.http"
+local http = require "resty.sse.http"
 local cjson = require "cjson"
 
-local _M = {_VERSION = '0.0.1'}
+local _M = {_VERSION = '0.0.2'}
 _M.__index = _M
 
 function _M.new()
