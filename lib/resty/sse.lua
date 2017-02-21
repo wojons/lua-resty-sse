@@ -1,7 +1,7 @@
 local http = require "resty.sse.http"
 local cjson = require "cjson"
 
-local _M = {_VERSION = '0.0.2'}
+local _M = {_VERSION = '0.0.3'}
 _M.__index = _M
 
 function _M.new()
@@ -70,10 +70,11 @@ function _M.request_uri(self, uri, params)
 end -- request_uri
 
 function _M.parse_sse(self, buffer)
-    local strut                 = { event = nil, id = nil, data = {} }
-    local strut_started         = false
-    local buffer_lines          = nil
-    local frame_break           = string.find(buffer, "\n\n") -- make sure we have at least one frame ini this
+    local strut         = { event = nil, id = nil, data = {} }
+    local strut_started = false
+    local buffer_lines  = nil
+    local frame_break   = string.find(buffer, "\n\n") -- make sure we have at least one frame ini this
+    local err           = nil
 
     if frame_break ~= nil then
         buffer_lines = self.split(string.sub(buffer, 1, frame_break), "\n") -- get one frame from the buffer and split it into lines
@@ -82,14 +83,14 @@ function _M.parse_sse(self, buffer)
     end -- if
 
     for _, dat in pairs(buffer_lines) do
-
         local s1, s2 = string.find(dat, ":") -- find where the cut point is
 
         if s1 and s1 ~= 1 then
-            strut_started = true
             local field = string.sub(dat, 1, s1-1) -- returns "data " from data: hello world
             local value = self:ltrim(string.sub(dat, s1+1)) -- returns "hello world" from data: hello world
             -- note: make sure to trim leading whitespace
+
+            if field then strut_started = true end
 
             -- for now not checking if the value is already been set
             if     field == "event" then strut.event = value
@@ -104,7 +105,11 @@ function _M.parse_sse(self, buffer)
     -- reply back with the rest of the buffer
     buffer = string.sub(buffer, frame_break+2) -- +2 because we want to be on the other side of \n\n
 
-    return strut, buffer, err
+    if strut_started then
+        return strut, buffer, err
+    else
+        return nil, buffer, err
+    end
 end -- parse_sse
 
 function _M.headers_format_request(self, headers)
