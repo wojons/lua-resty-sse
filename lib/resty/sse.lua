@@ -158,25 +158,16 @@ function _M.split(str, delim)
     return result
 end -- split
 
-function _M.default_cb(self)
-    if self["callbacks"] == nil then
-        self['callbacks'] = {}
-    end -- if
-
-    if self["callbacks"]["default"] == nil then
-        self['callbacks']["default"] = {}
-    end
-
-    self["callbacks"]["default"]["error"] = function(chunk, err)
+local default_callbacks = {
+    error = function(chunk, err)
         ngx.log(ngx.ERR, cjson.encode({chunk = chunk, error = err}))
         ngx.flush(false)
-    end -- function
-
-    self["callbacks"]["default"]["event"] = function(strut)
+    end, -- function
+    event = function(strut)
         ngx.say(cjson.encode({strut = strut}))
         ngx.flush(true)
     end -- function
-end
+}
 
 function _M.sse_loop(self, max_buffer, event_cb, error_cb)
 
@@ -190,13 +181,12 @@ function _M.sse_loop(self, max_buffer, event_cb, error_cb)
         --reader = self.httpc:w_body_reader(self.httpc.sock, nil, nil)
     else
         self.read_before = true -- set that we have read something off this buffer at least once
-        self:default_cb() -- load the deafult callbacks if not loaded
         self.buffer = ""  -- initialize buffer
         reader = self.res.body_reader -- get the parent reader
     end -- if
 
-    if not event_cb then event_cb = self["callbacks"]["default"]["event"] end
-    if not error_cb then error_cb = self["callbacks"]["default"]["error"] end
+    if not event_cb then event_cb = default_callbacks.event end
+    if not error_cb then error_cb = default_callbacks.error end
 
     repeat
         local chunk, err, pchunk= reader("*l")
