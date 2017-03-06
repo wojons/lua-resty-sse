@@ -1,6 +1,17 @@
 local http = require "resty.sse.http"
 local cjson = require "cjson"
 
+local DEFAULT_CALLBACKS = {
+    error = function(chunk, err)
+        ngx.log(ngx.ERR, cjson.encode({chunk = chunk, error = err}))
+        ngx.flush(false)
+    end, -- function
+    event = function(strut)
+        ngx.say(cjson.encode({strut = strut}))
+        ngx.flush(true)
+    end -- function
+}
+
 local _M = {_VERSION = '0.0.3'}
 _M.__index = _M
 
@@ -158,20 +169,8 @@ function _M.split(str, delim)
     return result
 end -- split
 
-local default_callbacks = {
-    error = function(chunk, err)
-        ngx.log(ngx.ERR, cjson.encode({chunk = chunk, error = err}))
-        ngx.flush(false)
-    end, -- function
-    event = function(strut)
-        ngx.say(cjson.encode({strut = strut}))
-        ngx.flush(true)
-    end -- function
-}
-
 function _M.sse_loop(self, max_buffer, event_cb, error_cb)
-
-    local reader = nil
+    local reader    = nil
     local parse_err = nil
     local strut     = nil
 
@@ -185,8 +184,8 @@ function _M.sse_loop(self, max_buffer, event_cb, error_cb)
         reader = self.res.body_reader -- get the parent reader
     end -- if
 
-    if not event_cb then event_cb = default_callbacks.event end
-    if not error_cb then error_cb = default_callbacks.error end
+    if not event_cb then event_cb = DEFAULT_CALLBACKS.event end
+    if not error_cb then error_cb = DEFAULT_CALLBACKS.error end
 
     repeat
         local chunk, err, pchunk= reader("*l")
