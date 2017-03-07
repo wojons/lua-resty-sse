@@ -1,4 +1,4 @@
-local http = require "resty.sse.http"
+local http = require "resty.http" -- https://github.com/pintsized/lua-resty-http
 local cjson = require "cjson"
 
 -- variable caching (https://www.cryptobells.com/properly-scoping-lua-nginx-modules-ngx-ctx/)
@@ -115,7 +115,7 @@ function _M.request_uri(self, uri, params)
     return self:request(params)
 end -- request_uri
 
-function _M.parse_sse(self, buffer)
+local function _parse_sse(buffer)
     local strut         = { event = nil, id = nil, data = {} }
     local strut_started = false
     local buffer_lines  = nil
@@ -229,7 +229,7 @@ function _M.sse_loop(self, max_buffer, event_cb, error_cb)
         -- until strut == nil or self.buffer:len() == 0 or parse_err ~= nil or leave == true
 
             -- parse the data that is in the buffer
-            strut, self.buffer, parse_err = self:parse_sse(self.buffer)
+            strut, self.buffer, parse_err = _parse_sse(self.buffer)
             if strut ~= nil and strut ~= false then
                 local leave = event_cb(strut)
             end -- if
