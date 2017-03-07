@@ -7,6 +7,35 @@ local str_sub    = string.sub
 local str_gfind  = string.gfind or string.gmatch -- http://lua-users.org/lists/lua-l/2013-04/msg00117.html
 local tbl_insert = table.insert
 
+-- internal/private string helpers
+local function str_trim(s) -- remove trailing and leading whitespace from string.
+  -- from PiL2 20.4
+  return (s:gsub("^%s*(.-)%s*$", "%1"))
+end
+
+local function str_ltrim(s) -- remove leading whitespace from string.
+  return (s:gsub("^%s*", ""))
+end
+
+local function str_rtrim(s) -- remove trailing whitespace from string.
+  local n = #s
+  while n > 0 and s:find("^%s", n) do n = n - 1 end
+  return s:sub(1, n)
+end
+
+function str_split(str, delim)
+    local result    = {}
+    local pat       = "(.-)"..delim.."()"
+    local lastPos   = 1
+
+    for part, pos in str_gfind(str, pat) do
+        tbl_insert(result, part)
+        lastPos = pos
+    end -- for
+    tbl_insert(result, str_sub(str, lastPos))
+    return result
+end -- split
+
 local DEFAULT_CALLBACKS = {
     error = function(chunk, err)
         ngx.log(ngx.ERR, cjson.encode({chunk = chunk, error = err}))
@@ -94,7 +123,7 @@ function _M.parse_sse(self, buffer)
     local err           = nil
 
     if frame_break ~= nil then
-        buffer_lines = self.split(str_sub(buffer, 1, frame_break), "\n") -- get one frame from the buffer and split it into lines
+        buffer_lines = str_split(str_sub(buffer, 1, frame_break), "\n") -- get one frame from the buffer and split it into lines
     else
         return nil, buffer, nil
     end -- if
@@ -104,7 +133,7 @@ function _M.parse_sse(self, buffer)
 
         if s1 and s1 ~= 1 then
             local field = str_sub(dat, 1, s1-1) -- returns "data " from data: hello world
-            local value = self:ltrim(str_sub(dat, s1+1)) -- returns "hello world" from data: hello world
+            local value = str_ltrim(str_sub(dat, s1+1)) -- returns "hello world" from data: hello world
             -- note: make sure to trim leading whitespace
 
             if field then strut_started = true end
@@ -160,19 +189,6 @@ function _M.headers_check_response(self)
     return true
 
 end -- headers_check_response
-
-function _M.split(str, delim)
-    local result    = {}
-    local pat       = "(.-)"..delim.."()"
-    local lastPos   = 1
-
-    for part, pos in str_gfind(str, pat) do
-        tbl_insert(result, part)
-        lastPos = pos
-    end -- for
-    tbl_insert(result, str_sub(str, lastPos))
-    return result
-end -- split
 
 function _M.sse_loop(self, max_buffer, event_cb, error_cb)
     local reader    = nil
@@ -230,23 +246,5 @@ function _M.sse_loop(self, max_buffer, event_cb, error_cb)
 
     until not chunk or not pchunk -- because we have nothing to do
 end -- sse_loop
-
--- remove trailing and leading whitespace from string.
-function _M.trim(self, s)
-  -- from PiL2 20.4
-  return (s:gsub("^%s*(.-)%s*$", "%1"))
-end
-
--- remove leading whitespace from string.
-function _M.ltrim(self, s)
-  return (s:gsub("^%s*", ""))
-end
-
--- remove trailing whitespace from string.
-function _M.rtrim(self, s)
-  local n = #s
-  while n > 0 and s:find("^%s", n) do n = n - 1 end
-  return s:sub(1, n)
-end
 
 return _M
