@@ -190,7 +190,7 @@ function _M.headers_check_response(self)
 
 end -- headers_check_response
 
-function _M.sse_loop(self, max_buffer, event_cb, error_cb)
+function _M.sse_loop(self, event_cb, error_cb)
     local reader    = nil
     local parse_err = nil
     local strut     = nil
