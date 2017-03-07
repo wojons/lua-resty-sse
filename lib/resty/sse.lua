@@ -195,7 +195,8 @@ function _M.sse_loop(self, event_cb, error_cb)
     local parse_err = nil
     local strut     = nil
     local leave     = nil
-    local reader    = self.httpc.sock:receive
+    local sock      = self.httpc.sock
+    local reader    = sock.receive
 
     self.buffer = self.buffer or "" -- initialize buffer
 
@@ -203,7 +204,7 @@ function _M.sse_loop(self, event_cb, error_cb)
     if not error_cb then error_cb = DEFAULT_CALLBACKS.error end
 
     repeat
-        local chunk, err, pchunk= reader("*l")
+        local chunk, err, pchunk= reader(sock,"*l")
         if err and err ~= "timeout" then -- if we have an error show it and and then hop out
             chunks = cjson.encode({chunk, pchunk})
             error_cb(chunks, err)
