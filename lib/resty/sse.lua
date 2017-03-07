@@ -81,9 +81,23 @@ function _M.connect(self, ...)
     return self.httpc:connect(...)
 end -- connect
 
+function _headers_format_request(headers)
+    if type(headers) ~= "table" then
+        headers = {}
+    end -- if
+
+    headers['Accept'] = "text/event-stream"
+
+    if headers['User-Agent'] == nil then
+        headers['User-Agent'] = "lua-resty-sse-v"
+    end -- if
+
+    return headers
+end -- headers_format_request
+
 function _M.request(self, params)
     params["method"]  = "GET"
-    params["headers"] = self:headers_format_request(params["headers"])
+    params["headers"] = _headers_format_request(params["headers"])
 
     local res, err = self.httpc:request(params)
     if err then
@@ -108,7 +122,7 @@ function _M.request_uri(self, uri, params)
     end
 
     params["path"]    = path
-    params["headers"] = self:headers_format_request(params["headers"])
+    params["headers"] = _headers_format_request(params["headers"])
     if params["headers"]["Host"] == nil then
         params["headers"]["Host"] = host
     end
@@ -157,20 +171,6 @@ local function _parse_sse(buffer)
         return nil, buffer, err
     end
 end -- parse_sse
-
-function _M.headers_format_request(self, headers)
-    if type(headers) ~= "table" then
-        headers = {}
-    end -- if
-
-    headers['Accept'] = "text/event-stream"
-
-    if headers['User-Agent'] == nil then
-        headers['User-Agent'] = "lua-resty-sse-v"
-    end -- if
-
-    return headers
-end -- headers_format_request
 
 function _M.headers_check_response(self)
     local find_mime = nil
