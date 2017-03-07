@@ -194,44 +194,39 @@ function _M.sse_loop(self, max_buffer, event_cb, error_cb)
     local reader    = nil
     local parse_err = nil
     local strut     = nil
+    local leave     = nil
+    local reader    = self.httpc.sock:receive
 
-    --only run this if we have run this before
-    if self.read_before then
-        reader = self.httpc:w_body_reader(self.httpc.sock, nil, 65536)
-        --reader = self.httpc:w_body_reader(self.httpc.sock, nil, nil)
-    else
-        self.read_before = true -- set that we have read something off this buffer at least once
-        self.buffer = ""  -- initialize buffer
-        reader = self.res.body_reader -- get the parent reader
-    end -- if
+    self.buffer = self.buffer or "" -- initialize buffer
 
     if not event_cb then event_cb = DEFAULT_CALLBACKS.event end
     if not error_cb then error_cb = DEFAULT_CALLBACKS.error end
 
     repeat
         local chunk, err, pchunk= reader("*l")
-        if err then -- if we have an error show it and and then hop out
+        if err and err ~= "timeout" then -- if we have an error show it and and then hop out
             chunks = cjson.encode({chunk, pchunk})
             error_cb(chunks, err)
             break -- break out of the code
         end -- if
 
-        if chunk ~= nil then -- this means we got a full line from the system
+        if chunk then -- this means we got a full line from the system
             self.buffer = self.buffer .. chunk .. "\n" -- update the buffer with the new chunk
         end -- if
 
-        if pchunk ~= nil then -- this means we did not get a full line
+        if pchunk then -- this means we did not get a full line
             self.buffer = self.buffer .. pchunk
         end -- if
 
-        -- todo: we may want to run this on pchunk but not sure yet
-        while chunk ~= nil or self.buffer:len() > 0 do
-        -- until strut == nil or self.buffer:len() == 0 or parse_err ~= nil or leave == true
+        if not chunk and not pchunk then -- because we have nothing new to parse
+            break
+        end
 
+        while self.buffer:len() > 0 do
             -- parse the data that is in the buffer
             strut, self.buffer, parse_err = _parse_sse(self.buffer)
             if strut ~= nil and strut ~= false then
-                local leave = event_cb(strut)
+                leave = event_cb(strut)
             end -- if
 
             -- lets see if its time to blow this popsical joint
@@ -243,7 +238,6 @@ function _M.sse_loop(self, max_buffer, event_cb, error_cb)
                 break
             end -- if
         end -- while
-
     until not chunk or not pchunk -- because we have nothing to do
 end -- sse_loop
 
