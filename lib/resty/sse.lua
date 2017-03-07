@@ -1,6 +1,12 @@
 local http = require "resty.sse.http"
 local cjson = require "cjson"
 
+-- variable caching (https://www.cryptobells.com/properly-scoping-lua-nginx-modules-ngx-ctx/)
+local str_find   = string.find
+local str_sub    = string.sub
+local str_gfind  = string.gfind or string.gmatch -- http://lua-users.org/lists/lua-l/2013-04/msg00117.html
+local tbl_insert = table.insert
+
 local DEFAULT_CALLBACKS = {
     error = function(chunk, err)
         ngx.log(ngx.ERR, cjson.encode({chunk = chunk, error = err}))
@@ -84,21 +90,21 @@ function _M.parse_sse(self, buffer)
     local strut         = { event = nil, id = nil, data = {} }
     local strut_started = false
     local buffer_lines  = nil
-    local frame_break   = string.find(buffer, "\n\n") -- make sure we have at least one frame ini this
+    local frame_break   = str_find(buffer, "\n\n") -- make sure we have at least one frame ini this
     local err           = nil
 
     if frame_break ~= nil then
-        buffer_lines = self.split(string.sub(buffer, 1, frame_break), "\n") -- get one frame from the buffer and split it into lines
+        buffer_lines = self.split(str_sub(buffer, 1, frame_break), "\n") -- get one frame from the buffer and split it into lines
     else
         return nil, buffer, nil
     end -- if
 
     for _, dat in pairs(buffer_lines) do
-        local s1, s2 = string.find(dat, ":") -- find where the cut point is
+        local s1, s2 = str_find(dat, ":") -- find where the cut point is
 
         if s1 and s1 ~= 1 then
-            local field = string.sub(dat, 1, s1-1) -- returns "data " from data: hello world
-            local value = self:ltrim(string.sub(dat, s1+1)) -- returns "hello world" from data: hello world
+            local field = str_sub(dat, 1, s1-1) -- returns "data " from data: hello world
+            local value = self:ltrim(str_sub(dat, s1+1)) -- returns "hello world" from data: hello world
             -- note: make sure to trim leading whitespace
 
             if field then strut_started = true end
@@ -106,7 +112,7 @@ function _M.parse_sse(self, buffer)
             -- for now not checking if the value is already been set
             if     field == "event" then strut.event = value
             elseif field == "id"    then strut.id = value
-            elseif field == "data"  then table.insert(strut.data, value)
+            elseif field == "data"  then tbl_insert(strut.data, value)
             end -- if
         else
             -- this is for comments
@@ -114,7 +120,7 @@ function _M.parse_sse(self, buffer)
     end -- for
 
     -- reply back with the rest of the buffer
-    buffer = string.sub(buffer, frame_break+2) -- +2 because we want to be on the other side of \n\n
+    buffer = str_sub(buffer, frame_break+2) -- +2 because we want to be on the other side of \n\n
 
     if strut_started then
         return strut, buffer, err
@@ -146,7 +152,7 @@ function _M.headers_check_response(self)
     end -- if
 
     -- make sure we got the right content type back in the headers
-    find_mime, _ = string.find(self.res.headers["Content-Type"], "text/event-stream")
+    find_mime, _ = str_find(self.res.headers["Content-Type"], "text/event-stream")
     if find_mime == nil then
         return nil, "Content Type not text/event-stream"
     end
@@ -160,12 +166,11 @@ function _M.split(str, delim)
     local pat       = "(.-)"..delim.."()"
     local lastPos   = 1
 
-    local gfind = string.gfind or string.gmatch -- http://lua-users.org/lists/lua-l/2013-04/msg00117.html
-    for part, pos in gfind(str, pat) do
-        table.insert(result, part)
+    for part, pos in str_gfind(str, pat) do
+        tbl_insert(result, part)
         lastPos = pos
     end -- for
-    table.insert(result, string.sub(str, lastPos))
+    tbl_insert(result, str_sub(str, lastPos))
     return result
 end -- split
 
