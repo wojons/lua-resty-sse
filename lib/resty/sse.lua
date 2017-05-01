@@ -176,14 +176,14 @@ function _M.headers_check_response(self)
     local find_mime = nil
 
     -- check to make sure the status code that came back is the coorect range
-    if self.res.status < 200 and self.res.status > 299 then
+    if self.res.status < 200 or self.res.status > 299 then
         return nil, "Status Non-200 ("..self.res.status..")"
     end -- if
 
     -- make sure we got the right content type back in the headers
-    find_mime, _ = str_find(self.res.headers["Content-Type"], "text/event-stream")
+    find_mime, _ = str_find(self.res.headers["Content-Type"], "text/event-stream",1,true)
     if find_mime == nil then
-        return nil, "Content Type not text/event-stream"
+        return nil, "Content Type not text/event-stream ("..self.res.headers["Content-Type"]..")"
     end
 
     return true
