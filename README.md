@@ -6,18 +6,6 @@ Lua Server Side Events client cosocket driver for [OpenResty](http://openresty.o
 
 This library is still under active development and is considered production ready.
 
-# API
-
-* [new](#name)
-* [connect](#connect)
-* [set_timeout](#set_timeout)
-* [set_keepalive](#set_keepalive)
-* [get_reused_times](#get_reused_times)
-* [close](#close)
-* [request](#request)
-* [request_uri](#request_uri)
-* [sse_loop](#sse_loop)
-
 ## Synopsis
 
 ``` lua
@@ -60,14 +48,20 @@ server {
 }
 ```
 
-# SSE
+# API
 
 ## SSE.new(url, headers)
 
+```lua 
+  local SSE = require "resty.sse"
+  local sse_client = SSE.new("http://sse_server.example/sse_url")
+```
 return new `sse` object, ready to connect to `url` with optional `headers` table
 
 ## sse:connect()
-
+```lua
+  local res, err = sse_client:connect()
+```
 attempt to connect to SSE server. return `true` on success, `nil, error` on failure.
 
 It is _not necessary_ to call this function explicitly, the `sse` client will attempt to `connect()` as needed.
