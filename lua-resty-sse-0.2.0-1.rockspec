@@ -7,7 +7,7 @@ source = {
 description = {
    detailed = "Lua Server Side Events client cosocket driver for [OpenResty](http://openresty.org/) / [ngx_lua](https://github.com/openresty/lua-nginx-module).",
    homepage = "https://github.com/wojons/lua-resty-sse",
-   license = "*** please specify a license ***",
+   license = "MIT",
 }
 dependencies = {
    "lua >= 5.1",
