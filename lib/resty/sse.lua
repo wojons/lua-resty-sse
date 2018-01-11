@@ -16,6 +16,9 @@ local SSE_module = {
 local SSE = {}
 SSE_metatable = {__index = SSE}
 
+SSE.connect_timeout = 5000 --default connect timeout is 5 minutes
+SSE.readline_timeout = 1000*60*60*24*10 -- 10 days in msec
+
 function SSE:connect()
   if self.http_client then
     return nil, "already connected"
@@ -26,6 +29,8 @@ function SSE:connect()
     self.error = err
     return nil, err
   end
+  
+  httpc:set_timeouts(self.connect_timeout, self.readline_timeout, self.readline_timeout)
 
   local parsed_uri, err = httpc:parse_uri(self.request_url)
   if not parsed_uri then
@@ -76,6 +81,8 @@ function SSE:connect()
 
   self.error = nil
   self.http_client = httpc
+  --set a _really_ long timeout
+  
   return true
 end
 
@@ -105,6 +112,7 @@ function SSE:events()
     line, err, partial = socket:receive("*l")
     if not line then
       if err == "timeout" then --we don't care about timeouts
+        --ngx.log(ngx.ERR, "ignore timeout")
         return readline() --no stack overflow danger, tail recusion calls are optimized away
       else
         self.error = err

@@ -89,3 +89,13 @@ if sse.error then
   --handle error stuff
 end
 ```
+
+## sse.connect_timeout
+
+max time to connect to SSE server, in milliseconds. Default is 5000
+
+## sse.readline_timeout
+
+max time to wait until retrying to read a line from the sse socket, in milliseconds. Should be really large for best efficiency. 
+
+Default is 10 days.
