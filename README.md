@@ -20,77 +20,78 @@ This library is still under active development and is considered production read
 
 ## Synopsis
 
-```` lua
+``` lua
 lua_package_path "/path/to/lua-resty-sse/lib/?.lua;;";
 
 server {
 
-
   location /simpleinterface {
-    resolver 8.8.8.8;  # Google's open DNS server for an example
+    resolver 8.8.8.8;  # Google open DNS server for an example
 
-    content_by_lua '
+    content_by_lua_block {
 
-      local sse = require "resty.sse"
+      local SSE = require "resty.sse"
 
-      local conn, err = sse.new()
-      if not conn then
-        ngx.say("failed to get connection: ", err)
-      end
+      local headers = {
+        ["X-Some-Header-Field"] = "foobar"
+      }
+      local sse = SSE.new("http://some-pub-sub-server.com/subscriber", headers) --header table is optional
+      --never fails, always returns new sse 'object'
 
-      local res, err = conn:request_uri("http://some-pub-sub-server.com/subscriber")
-
-      if not res then
-        ngx.say("failed to request: ", err)
+      --explicitly calling :connect() is optional. SSE will connect as needed
+      local ok, err = sse:connect()
+      if not ok then 
+        ngx.say("SSE failed: ", err)
         return
       end
 
-      while true
-        conn:sse_loop(nil, function(event)
-          ngx.say("got an event: ", err)
-        end, function(err)
-          ngx.say("got an error: ", err)
-        end)
+      --message processing loop 
+      for evt in sse:events() do
+        ngx.say("SSE id:", evt.id or "")
+        ngx.say("SSE event-type:", evt.type)
+        ngx.say("SSE data:", evt.data)
       end
-    ';
+      
+      --why did we exit the message processing loop?
+      if sse.error then
+        ngx.say("SSE error:", sse.error)
+      end
   }
 }
-````
+```
 
-# Connection
+# SSE
 
-## new
+## SSE.new(url, headers)
 
-TODO
+return new `sse` object, ready to connect to `url` with optional `headers` table
 
-## connect
+## sse:connect()
 
-TODO
+attempt to connect to SSE server. return `true` on success, `nil, error` on failure.
 
-## set_timeout
+It is _not necessary_ to call this function explicitly, the `sse` client will attempt to `connect()` as needed.
 
-TODO
+## sse:close()
 
-## set_keepalive
+close the connection
 
-TODO
+## sse.error
 
-## get_reused_times
+last error string from running the `sse` client, or nil when running without errors
 
-TODO
+## sse:events()
 
-## close
+`for`-loop iterator to receive SSE events:
 
-TODO
+```lua
 
-## request
+for evt in sse:events() do
+  --handle evt
+end
 
-TODO
-
-## request_uri
-
-TODO
-
-## sse_loop
-
-TODO
+--why did we exit the loop?
+if sse.error then
+  --handle error stuff
+end
+```
