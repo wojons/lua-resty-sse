@@ -50,7 +50,7 @@ server {
 
 # API
 
-## SSE.new(url, headers)
+## `SSE.new(url, headers)`
 
 ```lua 
   local SSE = require "resty.sse"
@@ -58,7 +58,7 @@ server {
 ```
 return new `sse` object, ready to connect to `url` with optional `headers` table
 
-## sse:connect()
+## `sse:connect()`
 ```lua
   local res, err = sse_client:connect()
 ```
@@ -66,15 +66,15 @@ attempt to connect to SSE server. return `true` on success, `nil, error` on fail
 
 It is _not necessary_ to call this function explicitly, the `sse` client will attempt to `connect()` as needed.
 
-## sse:close()
+## `sse:close()`
 
 close the connection
 
-## sse.error
+## `sse.error`
 
 last error string from running the `sse` client, or nil when running without errors
 
-## sse:events()
+## `sse:events()`
 
 `for`-loop iterator to receive SSE events:
 
@@ -90,11 +90,11 @@ if sse.error then
 end
 ```
 
-## sse.connect_timeout
+## `sse.connect_timeout`
 
 max time to connect to SSE server, in milliseconds. Default is 5000
 
-## sse.readline_timeout
+## `sse.readline_timeout`
 
 max time to wait until retrying to read a line from the sse socket, in milliseconds. Should be really large for best efficiency. 
 
