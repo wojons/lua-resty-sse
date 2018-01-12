@@ -16,7 +16,7 @@ local SSE_module = {
 local SSE = {}
 SSE_metatable = {__index = SSE}
 
-SSE.connect_timeout = 5000 --default connect timeout is 5 minutes
+SSE.connect_timeout = 5000 --default connect timeout is 5 seconds
 SSE.readline_timeout = 1000*60*60*24*10 -- 10 days in msec
 
 function SSE:connect()
