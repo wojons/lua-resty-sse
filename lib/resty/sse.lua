@@ -208,16 +208,16 @@ function _M.sse_loop(self, event_cb, error_cb)
             local struct, parse_err
             -- parse the data that is in the buffer
             struct, self.buffer, parse_err = _parse_sse(self.buffer)
-            if struct ~= nil and struct ~= false then
+
+            if parse_err ~= nil then ngx.log(ngx.ERR, cjson.encode({error = parse_err})) end
+
+            if struct ~= nil and struct ~= false and not parse_err then
                 leave = event_cb(struct)
             end -- if
 
+
             -- lets see if its time to blow this popsical joint
             if struct == nil or struct == false or leave == true or parse_err ~= nil then
-                if parse_err ~= nil then
-                    -- speak about the parse error
-                end -- if
-
                 break
             end -- if
         end -- while
