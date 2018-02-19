@@ -43,7 +43,7 @@ function _M.new()
     if not httpc then
         return nil, err
     end
-    local that = {httpc=httpc}
+    local that = {httpc=httpc,buffer=''}
     setmetatable(that, _M)
     return that
 end -- new
@@ -178,8 +178,6 @@ function _M.sse_loop(self, event_cb, error_cb)
     local leave  = false
     local sock   = self.httpc.sock
     local reader = sock.receive
-
-    self.buffer = self.buffer or "" -- initialize buffer
 
     event_cb = event_cb or DEFAULT_CALLBACKS.event
     error_cb = error_cb or DEFAULT_CALLBACKS.error
