@@ -181,8 +181,8 @@ function _M.sse_loop(self, event_cb, error_cb)
 
     self.buffer = self.buffer or "" -- initialize buffer
 
-    if not event_cb then event_cb = DEFAULT_CALLBACKS.event end
-    if not error_cb then error_cb = DEFAULT_CALLBACKS.error end
+    event_cb = event_cb or DEFAULT_CALLBACKS.event
+    error_cb = error_cb or DEFAULT_CALLBACKS.error
 
     repeat
         local chunk, err, pchunk= reader(sock,"*l")
@@ -192,17 +192,11 @@ function _M.sse_loop(self, event_cb, error_cb)
             break -- break out of the code
         end -- if
 
-        if chunk then -- this means we got a full line from the system
-            self.buffer = self.buffer .. chunk .. "\n" -- update the buffer with the new chunk
-        end -- if
+        if chunk then self.buffer = self.buffer .. chunk .. "\n" end  -- we got a full line (without the ending \n)
 
-        if pchunk then -- this means we did not get a full line
-            self.buffer = self.buffer .. pchunk
-        end -- if
+        if pchunk then self.buffer = self.buffer .. pchunk end -- we did not get a full line, but a partial one
 
-        if not chunk and not pchunk then -- because we have nothing new to parse
-            break
-        end
+        if not chunk and not pchunk then break end -- because we have nothing new to parse
 
         while self.buffer:len() > 0 do
             local struct, parse_err, _
