@@ -35,7 +35,7 @@ local DEFAULT_CALLBACKS = {
     end -- function
 }
 
-local _M = {_VERSION = '0.1.1'}
+local _M = {_VERSION = '0.1.2'}
 _M.__index = _M
 
 function _M.new()
