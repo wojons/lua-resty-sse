@@ -40,9 +40,7 @@ _M.__index = _M
 
 function _M.new()
     local httpc, err = http.new()
-    if not httpc then
-        return nil, err
-    end
+    if not httpc then return nil, err end
     local that = {httpc=httpc,buffer=''}
     setmetatable(that, _M)
     return that
@@ -65,20 +63,15 @@ function _M.close(self)
 end -- close
 
 function _M.connect(self, ...)
-    self.read_before = false
     return self.httpc:connect(...)
 end -- connect
 
 local function _headers_format_request(headers)
-    if type(headers) ~= "table" then
-        headers = {}
-    end -- if
+    if type(headers) ~= "table" then headers = {} end
 
     headers['Accept'] = "text/event-stream"
 
-    if headers['User-Agent'] == nil then
-        headers['User-Agent'] = "lua-resty-sse-v"
-    end -- if
+    if headers['User-Agent'] == nil then headers['User-Agent'] = "lua-resty-sse-v" end
 
     return headers
 end -- headers_format_request
@@ -88,9 +81,7 @@ function _M.request(self, params)
     params["headers"] = _headers_format_request(params["headers"])
 
     local res, err = self.httpc:request(params)
-    if err then
-        return nil, err
-    end -- if
+    if err then return nil, err end
 
     self.res = res
     return res, err
@@ -98,23 +89,18 @@ end -- request
 
 function _M.request_uri(self, uri, params)
     local parsed_uri, err = self.httpc:parse_uri(uri)
-    if not parsed_uri then
-        return nil, err
-    end
+    if not parsed_uri then return nil, err end
 
     local _, host, port, path = unpack(parsed_uri)
 
     local c
     c, err = self:connect(host, port)
-    if not c then
-        return nil, err
-    end
+    if not c then return nil, err end
 
     params["path"]    = path
     params["headers"] = _headers_format_request(params["headers"])
-    if params["headers"]["Host"] == nil then
-        params["headers"]["Host"] = host
-    end
+    if params["headers"]["Host"] == nil then params["headers"]["Host"] = host end
+
     return self:request(params)
 end -- request_uri
 
@@ -153,9 +139,8 @@ local function _parse_sse(buffer)
 
     if struct_started then
         return struct, buffer
-    else
-        return nil, buffer
     end
+    return nil, buffer
 end -- parse_sse
 
 function _M.headers_check_response(self)
@@ -171,7 +156,6 @@ function _M.headers_check_response(self)
     end
 
     return true
-
 end -- headers_check_response
 
 function _M.sse_loop(self, event_cb, error_cb)
