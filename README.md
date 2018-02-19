@@ -46,7 +46,7 @@ server {
       end
 
       while true
-        conn:sse_loop(nil, function(event)
+        conn:sse_loop(function(event)
           ngx.say("got an event: ", err)
         end, function(err)
           ngx.say("got an error: ", err)
