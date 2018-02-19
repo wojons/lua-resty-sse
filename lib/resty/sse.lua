@@ -193,7 +193,7 @@ function _M.sse_loop(self, event_cb, error_cb)
                 break
             end
         end -- while
-    until leave or not chunk or not pchunk -- because we have nothing to do
+    until leave or (not chunk and not pchunk) or err == 'timeout' -- because we have nothing to do
 end -- sse_loop
 
 return _M
