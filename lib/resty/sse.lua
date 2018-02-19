@@ -175,9 +175,9 @@ function _M.headers_check_response(self)
 end -- headers_check_response
 
 function _M.sse_loop(self, event_cb, error_cb)
-    local leave     = nil
-    local sock      = self.httpc.sock
-    local reader    = sock.receive
+    local leave  = false
+    local sock   = self.httpc.sock
+    local reader = sock.receive
 
     self.buffer = self.buffer or "" -- initialize buffer
 
@@ -205,23 +205,19 @@ function _M.sse_loop(self, event_cb, error_cb)
         end
 
         while self.buffer:len() > 0 do
-            local struct, parse_err
-            -- parse the data that is in the buffer
-            struct, self.buffer, parse_err = _parse_sse(self.buffer)
+            local struct, parse_err, _
+
+            struct, self.buffer, parse_err = _parse_sse(self.buffer) -- parse the data that is in the buffer
 
             if parse_err ~= nil then ngx.log(ngx.ERR, cjson.encode({error = parse_err})) end
 
-            if struct ~= nil and struct ~= false and not parse_err then
-                leave = event_cb(struct)
-            end -- if
-
-
-            -- lets see if its time to blow this popsical joint
-            if struct == nil or struct == false or leave == true or parse_err ~= nil then
+            if struct and not parse_err then
+                _, leave = event_cb(struct)
+            else
                 break
-            end -- if
+            end
         end -- while
-    until not chunk or not pchunk -- because we have nothing to do
+    until leave or not chunk or not pchunk -- because we have nothing to do
 end -- sse_loop
 
 return _M
