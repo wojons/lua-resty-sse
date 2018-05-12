@@ -108,19 +108,29 @@ function SSE:events()
 
   local evt_type, evt_id, evt_data = nil ,nil, {}
 
-  local line, err, partial
+  local line, err, partial, linebuf
   local socket = self.http_client.sock
   local function readline()
     line, err, partial = socket:receive("*l")
     if not line then
-      if err == "timeout" then --we don't care about timeouts
+      if err == "timeout" then --timeouts are ok
+        if partial and #partial > 0 then -- there was some data there
+          if not linebuf then linebuf = {} end
+          table.insert(linebuf, partial)
+        end
         --ngx.log(ngx.ERR, "ignore timeout")
         return readline() --no stack overflow danger, tail recusion calls are optimized away
       else
         self.error = err
       end
     end
-    -- pretty sure we don't care about partial reads. whole lines only plz
+    
+    if linebuf then
+      table.insert(linebuf, line)
+      line = table.concat(linebuf)
+      linebuf = nil
+    end
+    
     return line
   end
 
