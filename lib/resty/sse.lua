@@ -24,6 +24,8 @@ function SSE:connect()
     return nil, "already connected"
   end
   
+  self.error = nil
+  
   local httpc, err = http.new()
   if not httpc then
     self.error = err
