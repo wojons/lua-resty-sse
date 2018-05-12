@@ -93,7 +93,7 @@ function SSE:close()
   self.http_client = nil
 end
 
--- for event in sse:events do
+-- for event in sse:events() do
 --   ...
 --end
 function SSE:events()
