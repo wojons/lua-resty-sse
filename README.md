@@ -6,91 +6,96 @@ Lua Server Side Events client cosocket driver for [OpenResty](http://openresty.o
 
 This library is still under active development and is considered production ready.
 
-# API
-
-* [new](#name)
-* [connect](#connect)
-* [set_timeout](#set_timeout)
-* [set_keepalive](#set_keepalive)
-* [get_reused_times](#get_reused_times)
-* [close](#close)
-* [request](#request)
-* [request_uri](#request_uri)
-* [sse_loop](#sse_loop)
-
 ## Synopsis
 
-```` lua
+``` lua
 lua_package_path "/path/to/lua-resty-sse/lib/?.lua;;";
 
 server {
 
-
   location /simpleinterface {
-    resolver 8.8.8.8;  # Google's open DNS server for an example
+    resolver 8.8.8.8;  # Google open DNS server for an example
 
-    content_by_lua '
+    content_by_lua_block {
 
-      local sse = require "resty.sse"
+      local SSE = require "resty.sse"
 
-      local conn, err = sse.new()
-      if not conn then
-        ngx.say("failed to get connection: ", err)
-      end
+      local headers = {
+        ["X-Some-Header-Field"] = "foobar"
+      }
+      local sse = SSE.new("http://some-pub-sub-server.com/subscriber", headers) --header table is optional
+      --never fails, always returns new sse 'object'
 
-      local res, err = conn:request_uri("http://some-pub-sub-server.com/subscriber")
-
-      if not res then
-        ngx.say("failed to request: ", err)
+      --explicitly calling :connect() is optional. SSE will connect as needed
+      local ok, err = sse:connect()
+      if not ok then 
+        ngx.say("SSE failed: ", err)
         return
       end
 
-      while true
-        conn:sse_loop(function(event)
-          ngx.say("got an event: ", err)
-        end, function(err)
-          ngx.say("got an error: ", err)
-        end)
+      --message processing loop 
+      for evt in sse:events() do
+        ngx.say("SSE id:", evt.id or "")
+        ngx.say("SSE event-type:", evt.type)
+        ngx.say("SSE data:", evt.data)
       end
-    ';
+      
+      --why did we exit the message processing loop?
+      if sse.error then
+        ngx.say("SSE error:", sse.error)
+      end
   }
 }
-````
+```
 
-# Connection
+# API
 
-## new
+## `SSE.new(url, headers)`
 
-TODO
+```lua 
+  local SSE = require "resty.sse"
+  local sse_client = SSE.new("http://sse_server.example/sse_url")
+```
+return new `sse` object, ready to connect to `url` with optional `headers` table
 
-## connect
+## `sse:connect()`
+```lua
+  local res, err = sse_client:connect()
+```
+attempt to connect to SSE server. return `true` on success, `nil, error` on failure.
 
-TODO
+It is _not necessary_ to call this function explicitly, the `sse` client will attempt to `connect()` as needed.
 
-## set_timeout
+## `sse:close()`
 
-TODO
+close the connection
 
-## set_keepalive
+## `sse.error`
 
-TODO
+last error string from running the `sse` client, or nil when running without errors
 
-## get_reused_times
+## `sse:events()`
 
-TODO
+`for`-loop iterator to receive SSE events:
 
-## close
+```lua
 
-TODO
+for evt in sse:events() do
+  --handle evt
+end
 
-## request
+--why did we exit the loop?
+if sse.error then
+  --handle error stuff
+end
+```
 
-TODO
+## `sse.connect_timeout`
 
-## request_uri
+max time to connect to SSE server, in milliseconds. Default is 5000
 
-TODO
+## `sse.readline_timeout`
 
-## sse_loop
+max time to wait until retrying to read a line from the sse socket, in milliseconds. Should be really large for best efficiency. 
 
-TODO
+Default is 10 days.
