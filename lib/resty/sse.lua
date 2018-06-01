@@ -67,8 +67,9 @@ local function _headers_format_request(headers)
 end -- headers_format_request
 
 function _M.request(self, params)
-    params["method"]  = "GET"
-    params["headers"] = _headers_format_request(params["headers"])
+    params = params or {}
+    params.method  = "GET"
+    params.headers = _headers_format_request(params.headers)
 
     local res, err = self.httpc:request(params)
     if err then return nil, err end
@@ -87,9 +88,10 @@ function _M.request_uri(self, uri, params)
     c, err = self:connect(host, port)
     if not c then return nil, err end
 
-    params["path"]    = path
-    params["headers"] = _headers_format_request(params["headers"])
-    if params["headers"]["Host"] == nil then params["headers"]["Host"] = host end
+    params = params or {}
+    params.path    = path
+    params.headers = _headers_format_request(params.headers)
+    if not params.headers['Host'] then params.headers['Host'] = host end
 
     return self:request(params)
 end -- request_uri
@@ -168,7 +170,7 @@ function _M.receive(self)
 
             if parse_err then return struct, parse_err end
         end
-    until err or struct
+    until err or struct or not (chunk or pchunk)
 
     return struct, err
 end
