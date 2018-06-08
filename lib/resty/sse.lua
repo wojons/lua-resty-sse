@@ -1,11 +1,15 @@
 local http = require "resty.http" -- https://github.com/pintsized/lua-resty-http
-local cjson = require "cjson"
+
+local _M = {_VERSION = '0.2.0'}
+_M.__index = _M
 
 -- variable caching (https://www.cryptobells.com/properly-scoping-lua-nginx-modules-ngx-ctx/)
 local str_find   = string.find
 local str_sub    = string.sub
 local str_gfind  = string.gfind or string.gmatch -- http://lua-users.org/lists/lua-l/2013-04/msg00117.html
 local tbl_insert = table.insert
+
+local user_agent_header = "lua-resty-sse-v ".._M._VERSION
 
 local function str_ltrim(s) -- remove leading whitespace from string.
   return (s:gsub("^%s*", ""))
@@ -23,20 +27,6 @@ local function str_split(str, delim)
     tbl_insert(result, str_sub(str, lastPos))
     return result
 end -- split
-
-local DEFAULT_CALLBACKS = {
-    error = function(chunk, err)
-        ngx.log(ngx.ERR, cjson.encode({chunk = chunk, error = err}))
-        ngx.flush(false)
-    end, -- function
-    event = function(strut)
-        ngx.say(cjson.encode({strut = strut}))
-        ngx.flush(true)
-    end -- function
-}
-
-local _M = {_VERSION = '0.1.2'}
-_M.__index = _M
 
 function _M.new()
     local httpc, err = http.new()
@@ -71,14 +61,15 @@ local function _headers_format_request(headers)
 
     headers['Accept'] = "text/event-stream"
 
-    if headers['User-Agent'] == nil then headers['User-Agent'] = "lua-resty-sse-v" end
+    if not headers['User-Agent'] then headers['User-Agent'] = user_agent_header end
 
     return headers
 end -- headers_format_request
 
 function _M.request(self, params)
-    params["method"]  = "GET"
-    params["headers"] = _headers_format_request(params["headers"])
+    params = params or {}
+    params.method  = "GET"
+    params.headers = _headers_format_request(params.headers)
 
     local res, err = self.httpc:request(params)
     if err then return nil, err end
@@ -97,13 +88,15 @@ function _M.request_uri(self, uri, params)
     c, err = self:connect(host, port)
     if not c then return nil, err end
 
-    params["path"]    = path
-    params["headers"] = _headers_format_request(params["headers"])
-    if params["headers"]["Host"] == nil then params["headers"]["Host"] = host end
+    params = params or {}
+    params.path    = path
+    params.headers = _headers_format_request(params.headers)
+    if not params.headers['Host'] then params.headers['Host'] = host end
 
     return self:request(params)
 end -- request_uri
 
+-- It parses until a full frame of an SSE event if found and decoded
 local function _parse_sse(buffer)
     local struct         = { event = nil, id = nil, data = {} }
     local struct_started = false
@@ -122,7 +115,6 @@ local function _parse_sse(buffer)
         if s1 and s1 ~= 1 then
             local field = str_sub(dat, 1, s1-1) -- returns "data " from data: hello world
             local value = str_ltrim(str_sub(dat, s1+1)) -- returns "hello world" from data: hello world
-            -- note: make sure to trim leading whitespace
 
             if field then struct_started = true end
 
@@ -158,42 +150,29 @@ function _M.headers_check_response(self)
     return true
 end -- headers_check_response
 
-function _M.sse_loop(self, event_cb, error_cb)
-    local leave  = false
-    local sock   = self.httpc.sock
+-- It receives "lines" from the socket until one (or both) occurs:
+--   error reading from the socket (including read timeouts)
+--   an SSE event was found and decoded
+function _M.receive(self)
+    local chunk, err, pchunk, struct, parse_err
+    local sock = self.httpc.sock
     local reader = sock.receive
 
-    event_cb = event_cb or DEFAULT_CALLBACKS.event
-    error_cb = error_cb or DEFAULT_CALLBACKS.error
-
     repeat
-        local chunk, err, pchunk= reader(sock,"*l")
-        if err and err ~= "timeout" then -- if we have an error show it and and then hop out
-            local chunks = cjson.encode({chunk, pchunk})
-            error_cb(chunks, err)
-            break -- break out of the code
-        end -- if
+        chunk, err, pchunk = reader(sock,'*l')
 
-        if chunk then self.buffer = self.buffer .. chunk .. "\n" end  -- we got a full line (without the ending \n)
+        if chunk or pchunk then
+            if chunk then self.buffer = self.buffer .. chunk .. '\n' end  -- we got a full line (without the ending \n)
 
-        if pchunk then self.buffer = self.buffer .. pchunk end -- we did not get a full line, but a partial one
-
-        if not chunk and not pchunk then break end -- because we have nothing new to parse
-
-        while self.buffer:len() > 0 do
-            local struct, parse_err, _
+            if pchunk then self.buffer = self.buffer .. pchunk end -- we did not get a full line, but a partial one
 
             struct, self.buffer, parse_err = _parse_sse(self.buffer) -- parse the data that is in the buffer
 
-            if parse_err ~= nil then ngx.log(ngx.ERR, cjson.encode({error = parse_err})) end
+            if parse_err then return struct, parse_err end
+        end
+    until err or struct or not (chunk or pchunk)
 
-            if struct and not parse_err then
-                _, leave = event_cb(struct)
-            else
-                break
-            end
-        end -- while
-    until leave or (not chunk and not pchunk) or err == 'timeout' -- because we have nothing to do
-end -- sse_loop
+    return struct, err
+end
 
 return _M

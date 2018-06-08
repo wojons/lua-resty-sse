@@ -1,0 +1,13 @@
+-- See https://github.com/keplerproject/luacov/blob/master/src/luacov/defaults.lua
+return {
+  include = {
+    'lib/*',
+    'lib/**/*'
+  },
+  exclude = {
+    'test/*',
+    'test/**/*',
+  },
+  tick = true,
+  runreport = true
+}

@@ -16,7 +16,7 @@ This library is still under active development and is considered production read
 * [close](#close)
 * [request](#request)
 * [request_uri](#request_uri)
-* [sse_loop](#sse_loop)
+* [receive](#receive)
 
 ## Synopsis
 
@@ -29,8 +29,7 @@ server {
   location /simpleinterface {
     resolver 8.8.8.8;  # Google's open DNS server for an example
 
-    content_by_lua '
-
+    content_by_lua_block {
       local sse = require "resty.sse"
 
       local conn, err = sse.new()
@@ -46,13 +45,11 @@ server {
       end
 
       while true
-        conn:sse_loop(function(event)
-          ngx.say("got an event: ", err)
-        end, function(err)
-          ngx.say("got an error: ", err)
-        end)
+        local event, err = conn:receive()
+        if err then ngx.say("got an error: ", err) end
+        if event then  ngx.say("got an event: ", event) end
       end
-    ';
+    }
   }
 }
 ````
@@ -91,6 +88,6 @@ TODO
 
 TODO
 
-## sse_loop
+## receive
 
 TODO

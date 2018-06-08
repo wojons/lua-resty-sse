@@ -1,8 +1,8 @@
 package = "lua-resty-sse"
-version = "0.1.2-1"
+version = "0.2.0-1"
 source = {
    url = "git://github.com/wojons/lua-resty-sse.git",
-   tag = "v0.1.2",
+   tag = "v0.2.0",
 }
 description = {
    detailed = "Lua Server Side Events client cosocket driver for [OpenResty](http://openresty.org/) / [ngx_lua](https://github.com/openresty/lua-nginx-module).",
